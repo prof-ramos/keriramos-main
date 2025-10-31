@@ -1,0 +1,653 @@
+openapi: 3.0.3
+info:
+  title: API de Astrologia Brasileira
+  description: API RESTful completa para cálculos astrológicos focada no público brasileiro
+  version: 2.0.0
+  contact:
+    name: Suporte
+    email: suporte@astrologia.br
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.astrologia.br
+    description: Servidor de produção
+  - url: https://staging-api.astrologia.br
+    description: Servidor de staging
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  /api/v2/charts/natal:
+    post:
+      summary: Gerar mapa astral natal
+      description: Gera um mapa astral natal completo com posições planetárias, casas e aspectos
+      security:
+        - bearerAuth: []
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NatalChartRequest'
+            example:
+              name: "João Silva"
+              birth_date: "15/05/1990"
+              birth_time: "18:30"
+              city: "São Paulo"
+              state: "SP"
+              include_charts: true
+              chart_format: "SVG"
+      responses:
+        '200':
+          description: Mapa astral gerado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NatalChartResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/RateLimitError'
+
+  /api/v2/charts/{chart_id}:
+    get:
+      summary: Recuperar mapa astral salvo
+      parameters:
+        - name: chart_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID único do mapa astral
+      responses:
+        '200':
+          description: Mapa astral encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NatalChartResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/v2/charts/user/{user_id}:
+    get:
+      summary: Listar mapas do usuário
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [created_at, name, -created_at, -name]
+            default: -created_at
+      responses:
+        '200':
+          description: Lista de mapas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChartsListResponse'
+
+  /api/v2/auth/register:
+    post:
+      summary: Registrar novo usuário
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistrationRequest'
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '409':
+          description: Email já cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/ConflictError'
+
+  /api/v2/auth/login:
+    post:
+      summary: Fazer login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login realizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+
+  /api/v2/users/profile:
+    get:
+      summary: Obter perfil do usuário
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil do usuário
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+
+  /api/v2/locations/cities:
+    get:
+      summary: Buscar cidades brasileiras
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Termo de busca
+        - name: state
+          in: query
+          schema:
+            type: string
+            maxLength: 2
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Lista de cidades encontradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CitiesResponse'
+
+  /api/v2/batch/charts:
+    post:
+      summary: Gerar múltiplos mapas em lote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchChartsRequest'
+      responses:
+        '202':
+          description: Lote aceito para processamento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '403':
+          description: Plano não permite operações em lote
+
+  /api/v2/batch/status/{batch_id}:
+    get:
+      summary: Verificar status do lote
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status do lote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchStatusResponse'
+
+  /api/v2/analytics/usage:
+    get:
+      summary: Estatísticas de uso da API
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+            default: 30d
+      responses:
+        '200':
+          description: Estatísticas de uso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsResponse'
+
+  /api/v2/health:
+    get:
+      summary: Verificação de saúde da API
+      responses:
+        '200':
+          description: Status da API
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    NatalChartRequest:
+      type: object
+      required:
+        - name
+        - birth_date
+        - birth_time
+        - city
+        - state
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Nome completo da pessoa
+        birth_date:
+          type: string
+          pattern: '^\d{2}/\d{2}/\d{4}$'
+          description: Data de nascimento no formato DD/MM/YYYY
+        birth_time:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          description: Hora de nascimento no formato HH:MM
+        city:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Cidade de nascimento
+        state:
+          type: string
+          minLength: 2
+          maxLength: 2
+          description: Estado (sigla)
+        country:
+          type: string
+          default: BR
+        include_charts:
+          type: boolean
+          default: true
+          description: Incluir gráficos SVG/PNG na resposta
+        chart_format:
+          type: string
+          enum: [SVG, PNG]
+          default: SVG
+
+    NatalChartResponse:
+      type: object
+      properties:
+        chart_id:
+          type: string
+        user_id:
+          type: string
+          nullable: true
+        name:
+          type: string
+        sun_sign:
+          type: string
+        moon_sign:
+          type: string
+        rising_sign:
+          type: string
+        planets:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/PlanetPosition'
+        houses:
+          type: object
+          additionalProperties:
+            type: string
+        aspects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Aspect'
+        elements:
+          type: object
+          properties:
+            elemento:
+              type: string
+            qualidade:
+              type: string
+        location:
+          $ref: '#/components/schemas/Location'
+        charts:
+          $ref: '#/components/schemas/Charts'
+        created_at:
+          type: string
+          format: date-time
+        calculation_time_ms:
+          type: number
+
+    PlanetPosition:
+      type: object
+      properties:
+        sign:
+          type: string
+        house:
+          type: integer
+        degree:
+          type: number
+
+    Aspect:
+      type: object
+      properties:
+        planet1:
+          type: string
+        planet2:
+          type: string
+        aspect_type:
+          type: string
+        orb:
+          type: number
+
+    Location:
+      type: object
+      properties:
+        city:
+          type: string
+        state:
+          type: string
+        coordinates:
+          type: object
+          properties:
+            lat:
+              type: number
+            lng:
+              type: number
+        timezone:
+          type: string
+
+    Charts:
+      type: object
+      properties:
+        svg:
+          type: string
+          nullable: true
+        png:
+          type: string
+          nullable: true
+
+    UserRegistrationRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        plan:
+          type: string
+          enum: [free, premium, professional]
+          default: free
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        token_type:
+          type: string
+          default: bearer
+        expires_in:
+          type: integer
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    UserResponse:
+      type: object
+      properties:
+        user_id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        plan:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        email_verified:
+          type: boolean
+          default: false
+
+    CitiesResponse:
+      type: object
+      properties:
+        cities:
+          type: array
+          items:
+            type: object
+            properties:
+              city_id:
+                type: string
+              name:
+                type: string
+              state:
+                type: string
+              coordinates:
+                type: object
+                properties:
+                  lat:
+                    type: number
+                  lng:
+                    type: number
+              population:
+                type: integer
+
+    BatchChartsRequest:
+      type: object
+      required:
+        - requests
+      properties:
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/NatalChartRequest'
+          maxItems: 100
+        callback_url:
+          type: string
+          format: uri
+        priority:
+          type: string
+          enum: [low, normal, high]
+          default: normal
+
+    BatchResponse:
+      type: object
+      properties:
+        batch_id:
+          type: string
+        status:
+          type: string
+          enum: [processing, completed, failed]
+        total_requests:
+          type: integer
+        estimated_completion:
+          type: string
+          format: date-time
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+            redis:
+              type: string
+            geonames:
+              type: string
+        uptime:
+          type: string
+
+  responses:
+    ValidationError:
+      description: Dados de entrada inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: VALIDATION_ERROR
+            message: Formato de data inválido. Use DD/MM/YYYY
+            details:
+              field: birth_date
+              provided_value: "1990-05-15"
+            timestamp: "2024-01-15T10:30:00Z"
+            request_id: "req_123456"
+
+    UnauthorizedError:
+      description: Não autorizado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: UNAUTHORIZED
+            message: Token JWT inválido ou expirado
+            timestamp: "2024-01-15T10:30:00Z"
+            request_id: "req_123456"
+
+    RateLimitError:
+      description: Muitas requisições
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            rate_limit_exceeded:
+              value:
+                error_code: RATE_LIMIT_EXCEEDED
+                message: Muitas requisições. Aguarde antes de tentar novamente.
+                details:
+                  retry_after_seconds: 60
+                  limit: 10
+                  window_seconds: 60
+                timestamp: "2024-01-15T10:30:00Z"
+                request_id: "req_123456"
+
+    NotFoundError:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: NOT_FOUND
+            message: Mapa astral não encontrado
+            details:
+              resource_type: chart
+              resource_id: "chart_123"
+            timestamp: "2024-01-15T10:30:00Z"
+            request_id: "req_123456"
+
+    ConflictError:
+      description: Conflito de recursos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error_code: CONFLICT
+            message: Email já cadastrado
+            details:
+              field: email
+              value: "user@example.com"
+            timestamp: "2024-01-15T10:30:00Z"
+            request_id: "req_123456"
+
+  ErrorResponse:
+    type: object
+    required:
+      - error_code
+      - message
+      - timestamp
+      - request_id
+    properties:
+      error_code:
+        type: string
+      message:
+        type: string
+      details:
+        type: object
+      timestamp:
+        type: string
+        format: date-time
+      request_id:
+        type: string

@@ -1,0 +1,263 @@
+version: '3.8'
+
+services:
+  # Reverse proxy with automatic HTTPS
+  traefik:
+    image: traefik:v2.9
+    container_name: astrology-traefik
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@astrologia.br}
+      - --certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/configs/traefik/acme.json:/etc/traefik/acme.json
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Main API application with production configuration
+  api:
+    build:
+      context: .
+      target: runtime  # Use production stage
+      dockerfile: Dockerfile
+    container_name: astrology-api-prod
+    environment:
+      - DEBUG=false
+      - GEONAMES_USERNAME=${GEONAMES_USERNAME}
+      - SECRET_KEY=${SECRET_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=${DATABASE_URL:-postgresql://astrology_user:astrology_pass@postgres:5432/astrology_prod}
+      - ENVIRONMENT=production
+      - WORKERS=4
+    volumes:
+      - /app/__pycache__
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.api.rule=Host(`${API_HOST:-api.astrologia.br}`)
+      - traefik.http.routers.api.entrypoints=websecure
+      - traefik.http.routers.api.tls.certresolver=letsencrypt
+      - traefik.http.routers.api.service=api
+      - traefik.http.services.api.loadbalancer.server.port=8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis for caching and sessions (production ready)
+  redis:
+    image: redis:7-alpine
+    container_name: astrology-redis-prod
+    command: redis-server /etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-defaultpassword}
+    volumes:
+      - redis_data:/data
+      - ./docker/configs/redis.conf:/etc/redis/redis.conf
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # PostgreSQL database (production ready)
+  postgres:
+    image: postgres:15-alpine
+    container_name: astrology-postgres-prod
+    environment:
+      - POSTGRES_DB=astrology_prod
+      - POSTGRES_USER=astrology_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-astrology_pass}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/configs/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./logs/postgres:/var/log/postgresql
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astrology_user -d astrology_prod"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # PgAdmin for production database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: astrology-pgadmin-prod
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@astrologia.br}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD:-admin123}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/configs/pgadmin/servers.json:/pgadmin4/servers.json
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pgadmin.rule=Host(`${PGADMIN_HOST:-pgadmin.astrologia.br}`)
+      - traefik.http.routers.pgadmin.entrypoints=websecure
+      - traefik.http.routers.pgadmin.tls.certresolver=letsencrypt
+      - traefik.http.routers.pgadmin.service=pgadmin
+      - traefik.http.services.pgadmin.loadbalancer.server.port=80
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Monitoring stack with Prometheus and Grafana
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: astrology-prometheus
+    volumes:
+      - prometheus_data:/prometheus
+      - ./docker/configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_HOST:-prometheus.astrologia.br}`)
+      - traefik.http.routers.prometheus.entrypoints=websecure
+      - traefik.http.routers.prometheus.tls.certresolver=letsencrypt
+      - traefik.http.routers.prometheus.service=prometheus
+      - traefik.http.services.prometheus.loadbalancer.server.port=9090
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: astrology-grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/configs/grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.rule=Host(`${GRAFANA_HOST:-grafana.astrologia.br}`)
+      - traefik.http.routers.grafana.entrypoints=websecure
+      - traefik.http.routers.grafana.tls.certresolver=letsencrypt
+      - traefik.http.routers.grafana.service=grafana
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Portainer for Docker management
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: astrology-portainer
+    volumes:
+      - portainer_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - astrology-network
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOST:-portainer.astrologia.br}`)
+      - traefik.http.routers.portainer.entrypoints=websecure
+      - traefik.http.routers.portainer.tls.certresolver=letsencrypt
+      - traefik.http.routers.portainer.service=portainer
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  portainer_data:
+    driver: local
+
+networks:
+  astrology-network:
+    driver: bridge
+    attachable: true
