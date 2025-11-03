@@ -1,0 +1,392 @@
+/* ================================================
+   Terminal Base Styles
+   Core terminal styling with CSS custom properties
+   ================================================ */
+
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Terminal Background Colors */
+    --bg-primary: #0f0f0f;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #2a2a2a;
+    --bg-quaternary: #1f1f1f;
+
+    /* Terminal Text Colors */
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+    --text-tertiary: #707070;
+    --text-accent: #d97706;      /* Orange accent */
+    --text-success: #10b981;     /* Green for success */
+    --text-warning: #f59e0b;     /* Yellow for warnings */
+    --text-error: #ef4444;       /* Red for errors */
+    --text-info: #3b82f6;        /* Blue for info */
+
+    /* Terminal Borders */
+    --border-primary: #404040;
+    --border-secondary: #606060;
+    --border-accent: #d97706;
+
+    /* Terminal Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.7);
+
+    /* Terminal Spacing */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    /* Terminal Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    /* Terminal Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+
+    /* Terminal Typography */
+    --font-mono: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+}
+
+/* Base Body Styles */
+body {
+    font-family: var(--font-mono);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    font-size: var(--font-size-base);
+    overflow-x: hidden;
+}
+
+/* Main Terminal Container */
+.terminal {
+    min-height: 100vh;
+    background: var(--bg-primary);
+    padding: var(--spacing-xl);
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Terminal Header */
+.terminal-header {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-xl);
+    margin-bottom: var(--spacing-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.terminal-window-controls {
+    position: absolute;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    display: flex;
+    gap: var(--spacing-xs);
+    z-index: 10;
+}
+
+.window-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot-red {
+    background: #ff5f56;
+}
+
+.dot-yellow {
+    background: #ffbd2e;
+}
+
+.dot-green {
+    background: #27c93f;
+}
+
+.ascii-title {
+    text-align: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.ascii-art {
+    color: var(--text-accent);
+    font-size: 0.5rem;
+    line-height: 1.2;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(217, 119, 6, 0.3);
+}
+
+.terminal-subtitle {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-success);
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Terminal Navigation */
+.terminal-nav {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-lg);
+}
+
+.nav-prompt {
+    color: var(--text-accent);
+    font-weight: bold;
+    font-size: var(--font-size-lg);
+}
+
+.nav-commands {
+    list-style: none;
+    display: flex;
+    gap: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.nav-command {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-base);
+    border: 1px solid transparent;
+}
+
+.nav-command:hover {
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    border-color: var(--border-primary);
+}
+
+.nav-command.active {
+    color: var(--bg-primary);
+    background: var(--text-accent);
+    border-color: var(--text-accent);
+    font-weight: bold;
+}
+
+/* Terminal Sections */
+.terminal-section {
+    display: none;
+    animation: fadeIn var(--transition-slow);
+}
+
+.terminal-section.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Terminal Command Header */
+.terminal-command {
+    background: var(--bg-tertiary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-primary);
+    margin-bottom: var(--spacing-xl);
+}
+
+.header-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.search-title {
+    font-size: var(--font-size-2xl);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.terminal-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-success);
+    display: inline-block;
+    vertical-align: baseline;
+    margin-bottom: 2px;
+}
+
+.title-params {
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: normal;
+}
+
+.search-subtitle {
+    color: var(--text-accent);
+    font-size: var(--font-size-sm);
+    padding-left: var(--spacing-md);
+}
+
+/* Terminal Footer */
+.terminal-footer {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-lg);
+    margin-top: var(--spacing-2xl);
+}
+
+.footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+}
+
+.footer-section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.footer-prompt {
+    color: var(--text-accent);
+}
+
+.footer-link {
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color var(--transition-base);
+}
+
+.footer-link:hover {
+    color: var(--text-accent);
+}
+
+.footer-separator {
+    color: var(--border-primary);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: var(--radius-sm);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-secondary);
+}
+
+/* Selection Styling */
+::selection {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+}
+
+::-moz-selection {
+    background: var(--text-accent);
+    color: var(--bg-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .terminal {
+        padding: var(--spacing-md);
+    }
+
+    .ascii-art {
+        font-size: 0.35rem;
+    }
+
+    .terminal-nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .nav-commands {
+        width: 100%;
+    }
+
+    .footer-content {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .search-title {
+        font-size: var(--font-size-xl);
+    }
+}
+
+@media (max-width: 480px) {
+    .ascii-art {
+        font-size: 0.25rem;
+    }
+
+    .terminal-header {
+        padding: var(--spacing-md);
+    }
+}
